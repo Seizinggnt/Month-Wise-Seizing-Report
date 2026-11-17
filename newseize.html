@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seizure Live Month-Wise Dashboard</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #1e40af;
+      --primary-light: #dbeafe;
+      --live: #d97706;
+      --closed: #059669;
+      --released: #2563eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 16px; }
+    .container { max-width: 1480px; margin: 0 auto; }
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: #fff;
+      padding: 18px 24px;
+      border-radius: 14px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; }
+    header p { font-size: 0.82rem; color: #cbd5e1; margin-top: 4px; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    select, .btn {
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      border: none;
+    }
+    select { background: #fff; color: #0f172a; cursor: pointer; }
+    .btn-timer { background: #0284c7; color: #fff; cursor: pointer; }
+    .btn-timer.paused { background: #475569; }
+    .btn-refresh { background: #10b981; color: #fff; cursor: pointer; }
+    .btn-setup { background: #f59e0b; color: #0f172a; cursor: pointer; }
+    .setup-box {
+      background: #fff;
+      border: 2px solid #2563eb;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      display: none;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .setup-box.show { display: flex; }
+    .setup-box input {
+      flex: 1;
+      min-width: 300px;
+      padding: 10px 12px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      font-size: 0.86rem;
+    }
+    .btn-save { background: var(--primary); color: #fff; cursor: pointer; }
+    .status-banner {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.83rem;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .status-banner.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .status-banner.err { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .kpi {
+      background: var(--card);
+      padding: 15px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--primary);
+    }
+    .kpi.live { border-left-color: var(--live); }
+    .kpi.closed { border-left-color: var(--closed); }
+    .kpi.released { border-left-color: var(--released); }
+    .kpi.nov { border-left-color: #7c3aed; }
+    .kpi .title { font-size: 0.73rem; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+    .kpi .val { font-size: 1.75rem; font-weight: 800; margin: 5px 0 2px; }
+    .kpi .sub { font-size: 0.76rem; color: var(--muted); }
+    .section-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #1e3a8a;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin: 18px 0 10px;
+      padding-left: 4px;
+    }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 600px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px 18px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-header h2 { font-size: 0.93rem; font-weight: 700; color: #1e293b; }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    .table-wrap { max-height: 330px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #f8fafc; font-weight: 700; color: #334155; position: sticky; top: 0; z-index: 1; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.sub-row td { background: #f8fafc; color: #475569; padding-left: 22px; font-size: 0.8rem; }
+    tr.parent-row td { font-weight: 700; background: #eff6ff; }
+    tr.total-row td { background: #eef2ff; font-weight: 800; color: #1e3a8a; position: sticky; bottom: 0; }
+    .chart-box { width: 100%; min-height: 240px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.85rem; }
+    .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.76rem; margin-top: 8px; color: #475569; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Seizure Live Month-Wise Dashboard</h1>
+      <p>Select Any Sheet Tab / Month • Auto-Refreshes Every 60 Seconds</p>
+    </div>
+    <div class="controls">
+      <select id="tabSelect" title="Select Google Sheet Tab">
+        <option value="08 Nov 26" selected>Sheet Tab: 08 Nov 26</option>
+      </select>
+      <select id="monthSelect" title="Select Month Inside Tab">
+        <option value="ALL" selected>Month: All in Tab</option>
+      </select>
+      <button type="button" class="btn btn-timer" id="autoTimerBtn" onclick="toggleAutoRefresh()">Auto: 60s</button>
+      <button type="button" class="btn btn-refresh" id="refreshBtn">Refresh Now</button>
+      <button type="button" class="btn btn-setup" id="toggleSetupBtn" onclick="toggleSetupBox()">Google Sheet URL</button>
+    </div>
+  </header>
+
+  <div class="setup-box" id="setupBox">
+    <input type="text" id="webAppInput" placeholder="Paste Google Apps Script Web App URL (https://script.google.com/macros/s/.../exec)" />
+    <button type="button" class="btn btn-save" id="saveUrlBtn" onclick="saveAndLoadUrl()">Save & Load Live</button>
+  </div>
+
+  <div class="status-banner warn" id="statusBanner">
+    <span>Snapshot loaded. Live Google Sheet tabs sync kosam "Google Sheet URL" button nokki /exec link save cheyyandi.</span>
+  </div>
+
+  <section class="kpis">
+    <div class="kpi"><div class="title">Total Records (HP NO)</div><div class="val" id="kpiTotal">718</div><div class="sub" id="kpiYearSub">Tab Total: 718</div></div>
+    <div class="kpi live"><div class="title">Live (Active)</div><div class="val" id="kpiLive">447</div><div class="sub" id="kpiLiveSub">Selected Live: 48</div></div>
+    <div class="kpi closed"><div class="title">SZD CLOSED</div><div class="val" id="kpiClosed">195</div><div class="sub">Closed Records</div></div>
+    <div class="kpi released"><div class="title">RELEASED</div><div class="val" id="kpiReleased">76</div><div class="sub">Released Records</div></div>
+    <div class="kpi nov"><div class="title" id="kpiNovTitle">Selected Month Total</div><div class="val" id="kpiNov">56</div><div class="sub" id="kpiNovSub">E-Challan: ₹14,455</div></div>
+  </section>
+
+  <div class="section-title" id="sec1Title">Section 1: Overall Sheet Tab Summary</div>
+  <section class="grid-2">
+    <div class="card">
+      <div class="card-header"><h2>Chart: Month-wise Status Breakdown</h2><span class="badge" id="b1">Snapshot</span></div>
+      <div class="chart-box" id="ymChartBox"></div>
+      <div class="chart-legend">
+        <span><i class="dot" style="background:#f59e0b"></i>Live</span>
+        <span><i class="dot" style="background:#10b981"></i>SZD CLOSED</span>
+        <span><i class="dot" style="background:#3b82f6"></i>RELEASED</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Chart: Selected Month Date-wise & Running Total</h2><span class="badge" id="b2">Snapshot</span></div>
+      <div class="chart-box" id="novChartBox"></div>
+      <div class="chart-legend">
+        <span><i class="dot" style="background:#2563eb"></i>Daily Seizures</span>
+        <span><i class="dot" style="background:#dc2626"></i>Running Total</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card"><div class="card-header"><h2>Pivot 1: Year / Month / Date-wise & Running Total</h2><span class="badge" id="b3">Snapshot</span></div><div class="table-wrap" id="p1Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 2: Year & Month × Status</h2><span class="badge" id="b4">Snapshot</span></div><div class="table-wrap" id="p2Wrap"></div></div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px;">
+    <div class="card-header"><h2>Pivot 9: Location / Hub-wise Status Breakdown</h2><span class="badge" id="b5">Snapshot</span></div>
+    <div class="table-wrap" id="p9Wrap"></div>
+  </section>
+
+  <div class="section-title" id="sec2Title">Section 2: Selected Month Filtered Pivots</div>
+
+  <section class="grid-3">
+    <div class="card"><div class="card-header"><h2>Pivot 3: Incharge-wise (INCRG)</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p3Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 4: Line-wise (LINE)</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p4Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 5: EMI-wise (EMI)</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p5Wrap"></div></div>
+  </section>
+
+  <section class="grid-3">
+    <div class="card"><div class="card-header"><h2>Pivot 6: Model Year-wise (MODL)</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p6Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 7: WZ Zone-wise (WZ)</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p7Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 11: Key Status (KEY)</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p11Wrap"></div></div>
+  </section>
+
+  <section class="grid-3">
+    <div class="card"><div class="card-header"><h2>Pivot 8: WZ → FILE CON Drilldown</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p8Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 10: File Type-wise (FILE TYPE)</h2><span class="badge">FILE TYPE</span></div><div class="table-wrap" id="p10Wrap"></div></div>
+    <div class="card"><div class="card-header"><h2>Pivot 12: Finance-wise & Sum of E-Challan</h2><span class="badge">Filtered</span></div><div class="table-wrap" id="p12Wrap"></div></div>
+  </section>
+</div>
+
+<script>
+const DEFAULT_WEB_APP_URL = "";
+const AUTO_REFRESH_SECONDS = 60;
+
+const BUILTIN_SUMMARY = {
+  total: 718,
+  years: { 2026: 718 },
+  live: 447,
+  liveMonth: 48,
+  closed: 195,
+  released: 76,
+  latestLabel: "2026 Nov",
+  latestTotal: 56,
+  latestChallan: 14455,
+  p1: [
+    { label: "2026", count: 718, running: null, level: 0 },
+    { label: "Nov", count: 56, running: null, level: 1 },
+    { label: "01-Nov", count: 5, running: 5, level: 2 },
+    { label: "02-Nov", count: 4, running: 9, level: 2 },
+    { label: "03-Nov", count: 6, running: 15, level: 2 },
+    { label: "04-Nov", count: 3, running: 18, level: 2 },
+    { label: "05-Nov", count: 4, running: 22, level: 2 },
+    { label: "06-Nov", count: 5, running: 27, level: 2 },
+    { label: "07-Nov", count: 3, running: 30, level: 2 },
+    { label: "08-Nov", count: 4, running: 34, level: 2 },
+    { label: "09-Nov", count: 5, running: 39, level: 2 },
+    { label: "10-Nov", count: 6, running: 45, level: 2 },
+    { label: "11-Nov", count: 4, running: 49, level: 2 },
+    { label: "12-Nov", count: 7, running: 56, level: 2 }
+  ],
+  p2: [
+    { label: "2026", blank: 447, rel: 76, closed: 195, tot: 718, level: 0 },
+    { label: "Nov", blank: 48, rel: 4, closed: 4, tot: 56, level: 1 }
+  ],
+  p3: [{ k: "INCRG-1", v: 18 }, { k: "INCRG-2", v: 15 }, { k: "INCRG-3", v: 13 }, { k: "(blank)", v: 10 }],
+  p4: [{ k: "LINE-A", v: 22 }, { k: "LINE-B", v: 19 }, { k: "LINE-C", v: 15 }],
+  p5: [{ k: "1", v: 12 }, { k: "2", v: 18 }, { k: "3", v: 14 }, { k: "4+", v: 12 }],
+  p6: [{ k: "2022", v: 14 }, { k: "2023", v: 21 }, { k: "2024", v: 21 }],
+  p7: [{ k: "WZ-1", v: 29 }, { k: "WZ-2", v: 27 }],
+  p8: [
+    { label: "WZ-1", v: 29, sub: false }, { label: "CON-A", v: 16, sub: true }, { label: "CON-B", v: 13, sub: true },
+    { label: "WZ-2", v: 27, sub: false }, { label: "CON-C", v: 15, sub: true }, { label: "CON-D", v: 12, sub: true }
+  ],
+  p9: [
+    { loc: "Guntur", blank: 210, rel: 35, closed: 90, tot: 335 },
+    { loc: "Vijayawada", blank: 237, rel: 41, closed: 105, tot: 383 }
+  ],
+  p10: [{ k: "REGULAR", v: 41 }, { k: "SPECIAL", v: 15 }],
+  p11: [{ k: "WITH KEY", v: 42 }, { k: "WITHOUT KEY", v: 14 }],
+  p12: [{ fin: "FIN-A", cnt: 31, challan: 8200 }, { fin: "FIN-B", cnt: 25, challan: 6255 }]
+};
+
+let countdownSec = AUTO_REFRESH_SECONDS;
+let autoRefreshEnabled = true;
+let cachedPayload = null;
+const memStorage = {};
+
+function storageGet(key) {
+  try { return window.localStorage.getItem(key) || ""; } catch (e) { return memStorage[key] || ""; }
+}
+function storageSet(key, val) {
+  try { window.localStorage.setItem(key, val); } catch (e) { memStorage[key] = val; }
+}
+function getActiveUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const qUrl = (params.get('url') || '').trim();
+  if (qUrl) return qUrl;
+  return (storageGet('seizure_webapp_url') || DEFAULT_WEB_APP_URL).trim();
+}
+function updateTimerButton() {
+  const btn = document.getElementById('autoTimerBtn');
+  if (!btn) return;
+  if (!autoRefreshEnabled) {
+    btn.textContent = 'Auto: OFF';
+    btn.classList.add('paused');
+  } else {
+    btn.textContent = `Auto: ${countdownSec}s`;
+    btn.classList.remove('paused');
+  }
+}
+function toggleAutoRefresh() {
+  autoRefreshEnabled = !autoRefreshEnabled;
+  if (autoRefreshEnabled) countdownSec = AUTO_REFRESH_SECONDS;
+  updateTimerButton();
+}
+function toggleSetupBox() {
+  const box = document.getElementById('setupBox');
+  if (!box) return;
+  box.classList.toggle('show');
+  const inp = document.getElementById('webAppInput');
+  if (box.classList.contains('show') && inp) {
+    inp.value = getActiveUrl();
+    inp.focus();
+  }
+}
+function normalizeKey(k) {
+  return String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+const COLUMN_ALIASES = {
+  'HP NO': ['hpno', 'hp', 'hpnumber', 'hpnum', 'hpcode', 'agreementno'],
+  'SEZ DATE': ['sezdate', 'seizuredate', 'seizuredt', 'date', 'sezdt', 'seizedate'],
+  'STATUS': ['status', 'sezstatus', 'vehiclestatus'],
+  'INCRG': ['incrg', 'incharge', 'officer'],
+  'LINE': ['line', 'linename'],
+  'EMI': ['emi', 'emino', 'overdueemi'],
+  'MODL': ['modl', 'model', 'modelyear', 'year'],
+  'WZ': ['wz', 'zone', 'workzone'],
+  'FILE CON': ['filecon', 'filecontroller', 'filecontrol'],
+  'LOCATION': ['location', 'loc', 'hub', 'branch'],
+  'KEY': ['key', 'keystatus'],
+  'FILE TYPE': ['filetype', 'type', 'filetp'],
+  'FINANCE': ['finance', 'fin', 'financier'],
+  'E CHALN': ['echaln', 'echallan', 'challan', 'echallanamt']
+};
+function mapRowColumns(rawObj) {
+  const normMap = {};
+  Object.keys(rawObj).forEach(k => {
+    const nk = normalizeKey(k);
+    if (nk) normMap[nk] = rawObj[k];
+  });
+  const mapped = {};
+  Object.keys(COLUMN_ALIASES).forEach(stdKey => {
+    for (const a of COLUMN_ALIASES[stdKey]) {
+      if (normMap[a] !== undefined && String(normMap[a]).trim() !== '') {
+        mapped[stdKey] = normMap[a];
+        return;
+      }
+    }
+    const direct = normMap[normalizeKey(stdKey)];
+    mapped[stdKey] = direct !== undefined ? direct : '';
+  });
+  return mapped;
+}
+const MONTHS_MAP = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+function parseDateIndia(val) {
+  if (!val) return null;
+  const s = String(val).trim().split(' ')[0];
+  const mText = s.match(/^(\d{1,2})[\/\-]([a-zA-Z]{3})[\/\-](\d{2,4})$/);
+  if (mText) {
+    const m = MONTHS_MAP[mText[2].toLowerCase()];
+    let y = Number(mText[3]);
+    if (y < 100) y += 2000;
+    if (m !== undefined) return new Date(y, m, Number(mText[1]));
+  }
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (dmy) {
+    let y = Number(dmy[3]);
+    if (y < 100) y += 2000;
+    return new Date(y, Number(dmy[2]) - 1, Number(dmy[1]));
+  }
+  const ymd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  const dt = new Date(s);
+  return isNaN(dt) ? null : dt;
+}
+function normalizeStatus(rawStatus) {
+  const s = String(rawStatus || '').trim().toUpperCase();
+  if (!s || s === '(BLANK)' || s === 'NAN' || s === 'LIVE' || s === '-') return 'LIVE';
+  if (s.includes('CLOSED') || s === 'CLD') return 'SZD CLOSED';
+  if (s.includes('RELEASED') || s === 'REL') return 'RELEASED';
+  return 'LIVE';
+}
+function buildSummary(rawRows, sheetName, resetMonthSelect) {
+  if (!Array.isArray(rawRows) || !rawRows.length) return null;
+  const norm = v => (!v || String(v).trim() === '') ? '(blank)' : String(v).trim();
+  const valid = rawRows
+    .filter(r => !String(Object.values(r || {})[0] || '').toLowerCase().includes('sheetgo'))
+    .map(mapRowColumns)
+    .filter(r => String(r['HP NO'] || '').trim() && String(r['SEZ DATE'] || '').trim())
+    .map(r => {
+      const dt = parseDateIndia(r['SEZ DATE']);
+      if (!dt || isNaN(dt)) return null;
+      const y = dt.getFullYear();
+      if (y < 2020 || y > 2030) return null;
+      const mShort = dt.toLocaleString('en-US', { month: 'short' });
+      const dayStr = String(dt.getDate()).padStart(2, '0') + '-' + mShort;
+      return {
+        dt, y, mShort, dayStr,
+        status: normalizeStatus(r['STATUS']),
+        incrg: norm(r['INCRG']),
+        line: norm(r['LINE']).replace(/\.0$/, ''),
+        emi: norm(r['EMI']).replace(/\.0$/, ''),
+        modl: norm(r['MODL']).replace(/\.0$/, ''),
+        wz: norm(r['WZ']),
+        fileCon: norm(r['FILE CON']),
+        loc: norm(r['LOCATION']),
+        key: norm(r['KEY']),
+        fileType: norm(r['FILE TYPE']),
+        fin: norm(r['FINANCE']),
+        challan: Number(String(r['E CHALN'] || '0').replace(/,/g, '')) || 0
+      };
+    }).filter(Boolean);
+
+  if (!valid.length) return null;
+
+  const sortedByDate = [...valid].sort((a, b) => a.dt - b.dt);
+  const ymSet = [...new Set(sortedByDate.map(r => `${r.y}-${r.mShort}`))];
+  const sel = document.getElementById('monthSelect');
+  const prevVal = resetMonthSelect ? 'AUTO' : sel.value;
+
+  sel.innerHTML = `<option value="ALL">Month: All in "${sheetName}" (${ymSet.length})</option>` +
+    ymSet.map(ym => `<option value="${ym}">Month: ${ym}</option>`).join('');
+
+  if (!resetMonthSelect && [...sel.options].some(o => o.value === prevVal)) {
+    sel.value = prevVal;
+  } else {
+    // Tab lo 1 month unte daanne select chestundi; multiple months unte latest month select chestundi
+    sel.value = ymSet[ymSet.length - 1];
+  }
+
+  const chosenMonth = sel.value;
+  let latRecs, latestLabel, targetYear;
+
+  if (chosenMonth === 'ALL') {
+    latRecs = valid;
+    latestLabel = `${sheetName} (All Months)`;
+    targetYear = sortedByDate[sortedByDate.length - 1].y;
+  } else {
+    const [yy, mm] = chosenMonth.split('-');
+    targetYear = Number(yy);
+    latRecs = valid.filter(r => r.y === targetYear && r.mShort === mm);
+    latestLabel = `${mm} ${targetYear}`;
+  }
+
+  const countBy = (arr, fn) => {
+    const m = new Map();
+    arr.forEach(x => { const k = fn(x); m.set(k, (m.get(k) || 0) + 1); });
+    return [...m.entries()].map(([k, v]) => ({ k, v })).sort((a, b) => a.k.localeCompare(b.k));
+  };
+
+  const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const yearsList = [...new Set(valid.map(r => r.y))].sort();
+  const p1 = [], p2 = [];
+
+  yearsList.forEach(yr => {
+    const ySub = valid.filter(r => r.y === yr);
+    p1.push({ label: String(yr), count: ySub.length, running: null, level: 0 });
+    p2.push({
+      label: String(yr),
+      blank: ySub.filter(r => r.status === 'LIVE').length,
+      rel: ySub.filter(r => r.status === 'RELEASED').length,
+      closed: ySub.filter(r => r.status === 'SZD CLOSED').length,
+      tot: ySub.length, level: 0
+    });
+    if (yr === targetYear) {
+      monthOrder.forEach(m => {
+        const mSub = ySub.filter(r => r.mShort === m);
+        if (mSub.length > 0) {
+          p1.push({ label: m, count: mSub.length, running: null, level: 1 });
+          p2.push({
+            label: m,
+            blank: mSub.filter(r => r.status === 'LIVE').length,
+            rel: mSub.filter(r => r.status === 'RELEASED').length,
+            closed: mSub.filter(r => r.status === 'SZD CLOSED').length,
+            tot: mSub.length, level: 1
+          });
+        }
+      });
+    }
+  });
+
+  const dayMap = new Map();
+  [...latRecs].sort((a, b) => a.dt - b.dt).forEach(r => dayMap.set(r.dayStr, (dayMap.get(r.dayStr) || 0) + 1));
+  let run = 0;
+  dayMap.forEach((count, label) => p1.push({ label, count, running: (run += count), level: 2 }));
+
+  const wzList = [...new Set(latRecs.map(r => r.wz))].sort();
+  const p8 = [];
+  wzList.forEach(wz => {
+    const wSub = latRecs.filter(r => r.wz === wz);
+    p8.push({ label: wz, v: wSub.length, sub: false });
+    countBy(wSub, r => r.fileCon).forEach(fc => p8.push({ label: fc.k, v: fc.v, sub: true }));
+  });
+
+  const locList = [...new Set(valid.map(r => r.loc))].sort();
+  const p9 = locList.map(loc => {
+    const sub = valid.filter(r => r.loc === loc);
+    return {
+      loc,
+      blank: sub.filter(r => r.status === 'LIVE').length,
+      rel: sub.filter(r => r.status === 'RELEASED').length,
+      closed: sub.filter(r => r.status === 'SZD CLOSED').length,
+      tot: sub.length
+    };
+  });
+
+  const fins12 = [...new Set(latRecs.map(r => r.fin))].sort();
+  const p12 = fins12.map(fin => {
+    const sub = latRecs.filter(r => r.fin === fin);
+    return { fin, cnt: sub.length, challan: sub.reduce((s, r) => s + r.challan, 0) };
+  });
+
+  return {
+    total: valid.length,
+    live: valid.filter(r => r.status === 'LIVE').length,
+    liveMonth: latRecs.filter(r => r.status === 'LIVE').length,
+    closed: valid.filter(r => r.status === 'SZD CLOSED').length,
+    released: valid.filter(r => r.status === 'RELEASED').length,
+    latestLabel,
+    latestTotal: latRecs.length,
+    latestChallan: latRecs.reduce((s, r) => s + r.challan, 0),
+    p1, p2,
+    p3: countBy(latRecs, r => r.incrg),
+    p4: countBy(latRecs, r => r.line),
+    p5: countBy(latRecs, r => r.emi),
+    p6: countBy(latRecs, r => r.modl),
+    p7: countBy(latRecs, r => r.wz),
+    p8, p9,
+    p10: countBy(latRecs, r => r.fileType),
+    p11: countBy(latRecs, r => r.key),
+    p12
+  };
+}
+
+function renderSvgStackedChart(containerId, items) {
+  const w = 520, h = 220, padL = 42, padB = 34, padT = 18, padR = 16;
+  const maxVal = Math.max(10, ...items.map(d => d.blank + d.closed + d.rel));
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const barW = Math.min(44, Math.floor(plotW / Math.max(1, items.length)) - 12);
+  let bars = '';
+  items.forEach((d, idx) => {
+    const x = padL + idx * (plotW / items.length) + (plotW / items.length - barW) / 2;
+    const h1 = (d.blank / maxVal) * plotH, h2 = (d.closed / maxVal) * plotH, h3 = (d.rel / maxVal) * plotH;
+    let y = padT + plotH;
+    if (h1 > 0) { y -= h1; bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h1}" fill="#f59e0b"/>`; }
+    if (h2 > 0) { y -= h2; bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h2}" fill="#10b981"/>`; }
+    if (h3 > 0) { y -= h3; bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h3}" fill="#3b82f6"/>`; }
+    bars += `<text x="${x + barW/2}" y="${h - 12}" text-anchor="middle" font-size="11" fill="#334155">${d.label}</text>`;
+    bars += `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="700" fill="#0f172a">${d.tot}</text>`;
+  });
+  document.getElementById(containerId).innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:220px;"><line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="#94a3b8" stroke-width="1"/>${bars}</svg>`;
+}
+
+function renderSvgDailyChart(containerId, dayRows) {
+  const w = 520, h = 220, padL = 42, padB = 34, padT = 18, padR = 24;
+  const maxVal = Math.max(10, ...dayRows.map(d => d.running));
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const step = plotW / Math.max(1, dayRows.length);
+  const barW = Math.min(30, step - 10);
+  let bars = '', pts = [];
+  dayRows.forEach((d, idx) => {
+    const cx = padL + idx * step + step / 2;
+    const bh = (d.count / maxVal) * plotH;
+    const by = padT + plotH - bh;
+    const ry = padT + plotH - (d.running / maxVal) * plotH;
+    bars += `<rect x="${cx - barW/2}" y="${by}" width="${barW}" height="${bh}" fill="#2563eb" rx="2"/>`;
+    bars += `<text x="${cx}" y="${by - 3}" text-anchor="middle" font-size="10" fill="#1e40af">${d.count}</text>`;
+    bars += `<text x="${cx}" y="${h - 12}" text-anchor="middle" font-size="10" fill="#334155">${d.label}</text>`;
+    pts.push(`${cx},${ry}`);
+  });
+  document.getElementById(containerId).innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:220px;"><line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="#94a3b8" stroke-width="1"/>${bars}<polyline fill="none" stroke="#dc2626" stroke-width="2.2" points="${pts.join(' ')}"/></svg>`;
+}
+
+function renderDashboard(data, sourceLabel, isLive) {
+  const banner = document.getElementById('statusBanner');
+  banner.className = isLive ? 'status-banner' : 'status-banner warn';
+  banner.innerHTML =
+    `<span>${isLive ? 'LIVE SHEET TAB' : 'SNAPSHOT'}: <strong>${sourceLabel}</strong></span>` +
+    `<span>Tab Total: <strong>${data.total}</strong> | Live: <strong>${data.live}</strong> | ${data.latestLabel}: <strong>${data.latestTotal}</strong> | E-Challan: <strong>₹${data.latestChallan.toLocaleString('en-IN')}</strong> | Synced: ${new Date().toLocaleTimeString()}</span>`;
+
+  ['b1','b2','b3','b4','b5'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = isLive ? 'Live Sheet' : 'Snapshot';
+  });
+
+  document.getElementById('kpiTotal').textContent = data.total;
+  document.getElementById('kpiYearSub').textContent = `Tab Total: ${data.total}`;
+  document.getElementById('kpiLive').textContent = data.live;
+  document.getElementById('kpiLiveSub').textContent = `${data.latestLabel} Live: ${data.liveMonth}`;
+  document.getElementById('kpiClosed').textContent = data.closed;
+  document.getElementById('kpiReleased').textContent = data.released;
+  document.getElementById('kpiNovTitle').textContent = `${data.latestLabel} Total`;
+  document.getElementById('kpiNov').textContent = data.latestTotal;
+  document.getElementById('kpiNovSub').textContent = `E-Challan: ₹${data.latestChallan.toLocaleString('en-IN')}`;
+  document.getElementById('sec1Title').textContent = `Section 1: Overall Summary (${sourceLabel})`;
+  document.getElementById('sec2Title').textContent = `Section 2: ${data.latestLabel} Filtered Pivots (Total: ${data.latestTotal})`;
+
+  let p1 = `<table><thead><tr><th>Row Labels</th><th class="num">Count of HP NO</th><th class="num">Running Total</th></tr></thead><tbody>`;
+  data.p1.forEach(r => {
+    const cls = r.level === 0 ? 'parent-row' : r.level === 2 ? 'sub-row' : '';
+    p1 += `<tr class="${cls}"><td>${r.label}</td><td class="num">${r.count ?? ''}</td><td class="num">${r.running ?? ''}</td></tr>`;
+  });
+  p1 += `<tr class="total-row"><td>Grand Total</td><td class="num">${data.total}</td><td class="num">${data.latestTotal}</td></tr></tbody></table>`;
+  document.getElementById('p1Wrap').innerHTML = p1;
+
+  let p2 = `<table><thead><tr><th>Row Labels</th><th class="num">LIVE</th><th class="num">RELEASED</th><th class="num">SZD CLOSED</th><th class="num">Grand Total</th></tr></thead><tbody>`;
+  data.p2.forEach(r => {
+    p2 += `<tr class="${r.level === 0 ? 'parent-row' : ''}"><td>${r.label}</td><td class="num">${r.blank}</td><td class="num">${r.rel}</td><td class="num">${r.closed}</td><td class="num">${r.tot}</td></tr>`;
+  });
+  p2 += `<tr class="total-row"><td>Grand Total</td><td class="num">${data.live}</td><td class="num">${data.released}</td><td class="num">${data.closed}</td><td class="num">${data.total}</td></tr></tbody></table>`;
+  document.getElementById('p2Wrap').innerHTML = p2;
+
+  let p9 = `<table><thead><tr><th>Location</th><th class="num">LIVE</th><th class="num">RELEASED</th><th class="num">SZD CLOSED</th><th class="num">Grand Total</th></tr></thead><tbody>`;
+  data.p9.forEach(r => {
+    p9 += `<tr><td>${r.loc}</td><td class="num">${r.blank}</td><td class="num">${r.rel}</td><td class="num">${r.closed}</td><td class="num">${r.tot}</td></tr>`;
+  });
+  p9 += `<tr class="total-row"><td>Grand Total</td><td class="num">${data.live}</td><td class="num">${data.released}</td><td class="num">${data.closed}</td><td class="num">${data.total}</td></tr></tbody></table>`;
+  document.getElementById('p9Wrap').innerHTML = p9;
+
+  const renderCount = (id, title, rows, tot) => {
+    let h = `<table><thead><tr><th>${title}</th><th class="num">Count of HP NO</th></tr></thead><tbody>`;
+    rows.forEach(r => { h += `<tr><td>${r.k}</td><td class="num">${r.v}</td></tr>`; });
+    h += `<tr class="total-row"><td>Grand Total</td><td class="num">${tot}</td></tr></tbody></table>`;
+    document.getElementById(id).innerHTML = h;
+  };
+  renderCount('p3Wrap', 'Incharge (INCRG)', data.p3, data.latestTotal);
+  renderCount('p4Wrap', 'Line (LINE)', data.p4, data.latestTotal);
+  renderCount('p5Wrap', 'EMI', data.p5, data.latestTotal);
+  renderCount('p6Wrap', 'Model Year (MODL)', data.p6, data.latestTotal);
+  renderCount('p7Wrap', 'WZ Zone', data.p7, data.latestTotal);
+  renderCount('p10Wrap', 'File Type (FILE TYPE)', data.p10, data.latestTotal);
+  renderCount('p11Wrap', 'Key Status (KEY)', data.p11, data.latestTotal);
+
+  let p8 = `<table><thead><tr><th>WZ / FILE CON</th><th class="num">Count of HP NO</th></tr></thead><tbody>`;
+  data.p8.forEach(r => { p8 += `<tr class="${r.sub ? 'sub-row' : 'parent-row'}"><td>${r.label}</td><td class="num">${r.v}</td></tr>`; });
+  p8 += `<tr class="total-row"><td>Grand Total</td><td class="num">${data.latestTotal}</td></tr></tbody></table>`;
+  document.getElementById('p8Wrap').innerHTML = p8;
+
+  let p12 = `<table><thead><tr><th>Finance</th><th class="num">Count of HP NO</th><th class="num">Sum of E CHALN</th></tr></thead><tbody>`;
+  data.p12.forEach(r => { p12 += `<tr><td>${r.fin}</td><td class="num">${r.cnt}</td><td class="num">${r.challan}</td></tr>`; });
+  p12 += `<tr class="total-row"><td>Grand Total</td><td class="num">${data.latestTotal}</td><td class="num">${data.latestChallan}</td></tr></tbody></table>`;
+  document.getElementById('p12Wrap').innerHTML = p12;
+
+  renderSvgStackedChart('ymChartBox', data.p2.filter(r => r.level === 1));
+  renderSvgDailyChart('novChartBox', data.p1.filter(r => r.level === 2));
+}
+
+async function fetchLiveFromAppsScript(url, requestedTab = '', resetMonthSelect = false) {
+  countdownSec = AUTO_REFRESH_SECONDS;
+  updateTimerButton();
+  const banner = document.getElementById('statusBanner');
+
+  if (!url || !url.includes('/exec')) {
+    banner.className = 'status-banner warn';
+    banner.innerHTML = '<span>Snapshot loaded. Live Google Sheet tabs sync kosam "Google Sheet URL" button nokki /exec link save cheyyandi.</span>';
+    return;
+  }
+
+  banner.className = 'status-banner warn';
+  banner.innerHTML = `<span>Syncing "${requestedTab || '08 Nov 26'}" tab from Google Sheet...</span>`;
+
+  const sep = url.includes('?') ? '&' : '?';
+  const tabParam = requestedTab ? `&tab=${encodeURIComponent(requestedTab)}` : '';
+  const freshUrl = `${url}${sep}_t=${Date.now()}${tabParam}`;
+
+  try {
+    const res = await fetch(freshUrl, { cache: 'no-store' });
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      banner.className = 'status-banner err';
+      banner.innerHTML = '<span>Live Sync Failed: Apps Script JSON ivvaledu (Deploy → Who has access: Anyone & New version check cheyyandi).</span>';
+      return;
+    }
+
+    if (Array.isArray(json.tabs) && json.tabs.length > 0) {
+      const tabSel = document.getElementById('tabSelect');
+      tabSel.innerHTML = json.tabs.map(t => `<option value="${t}">Sheet Tab: ${t}</option>`).join('');
+      if (json.sheetName && json.tabs.includes(json.sheetName)) {
+        tabSel.value = json.sheetName;
+        storageSet('seizure_selected_tab', json.sheetName);
+      }
+    }
+
+    if (json.error) {
+      banner.className = 'status-banner err';
+      banner.innerHTML = `<span>Live Sync Failed: ${json.error}</span>`;
+      return;
+    }
+
+    if (!json.rows || !json.rows.length) {
+      banner.className = 'status-banner err';
+      banner.innerHTML = `<span>Tab "${json.sheetName || requestedTab}" lo 0 rows vachayi.</span>`;
+      return;
+    }
+
+    const summary = buildSummary(json.rows, json.sheetName || requestedTab, resetMonthSelect);
+    if (!summary) {
+      const sampleHeaders = Object.keys(json.rows[0] || {}).join(', ');
+      banner.className = 'status-banner err';
+      banner.innerHTML = `<span>HP NO / SEZ DATE match avvaledu. Headers: [${sampleHeaders}]</span>`;
+      return;
+    }
+
+    cachedPayload = json;
+    renderDashboard(summary, `${json.sheetName} (${json.rows.length} rows)`, true);
+  } catch (err) {
+    banner.className = 'status-banner err';
+    banner.innerHTML = `<span>Live Sync Failed: ${err.message}</span>`;
+  }
+}
+
+function saveAndLoadUrl() {
+  const inp = document.getElementById('webAppInput');
+  const url = (inp ? inp.value : '').trim();
+  storageSet('seizure_webapp_url', url);
+  const box = document.getElementById('setupBox');
+  if (box) box.classList.remove('show');
+  const savedTab = storageGet('seizure_selected_tab') || '08 Nov 26';
+  fetchLiveFromAppsScript(url, savedTab, true);
+}
+
+document.getElementById('tabSelect').addEventListener('change', (e) => {
+  const chosenTab = e.target.value;
+  storageSet('seizure_selected_tab', chosenTab);
+  fetchLiveFromAppsScript(getActiveUrl(), chosenTab, true);
+});
+
+document.getElementById('monthSelect').addEventListener('change', () => {
+  if (cachedPayload && cachedPayload.rows) {
+    const summary = buildSummary(cachedPayload.rows, cachedPayload.sheetName || 'Selected Tab', false);
+    if (summary) renderDashboard(summary, `${cachedPayload.sheetName} (${cachedPayload.rows.length} rows)`, true);
+  }
+});
+
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '08 Nov 26';
+  fetchLiveFromAppsScript(getActiveUrl(), currentTab, false);
+});
+
+setInterval(() => {
+  if (!autoRefreshEnabled) return;
+  const activeUrl = getActiveUrl();
+  if (!activeUrl || !activeUrl.includes('/exec')) return;
+  countdownSec -= 1;
+  if (countdownSec <= 0) {
+    countdownSec = AUTO_REFRESH_SECONDS;
+    const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '08 Nov 26';
+    fetchLiveFromAppsScript(activeUrl, currentTab, false);
+  }
+  updateTimerButton();
+}, 1000);
+
+renderDashboard(BUILTIN_SUMMARY, 'Built-in Snapshot (08 Nov 26)', false);
+updateTimerButton();
+const startUrl = getActiveUrl();
+const initialTab = storageGet('seizure_selected_tab') || '08 Nov 26';
+if (startUrl) {
+  document.getElementById('webAppInput').value = startUrl;
+  fetchLiveFromAppsScript(startUrl, initialTab, true);
+}
+</script>
+</body>
+</html>

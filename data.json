@@ -1,0 +1,10 @@
+{
+  "updatedAt": "2026-11-18T19:30:00.000Z",
+  "defaultTab": "08 Nov 26",
+  "tabs": ["08 Nov 26"],
+  "dataByTab": {
+    "08 Nov 26": [
+      { "HP NO": "HP101", "SEZ DATE": "08-Nov-26", "STATUS": "LIVE", "INCRG": "INCRG-1", "LINE": "LINE-A", "EMI": "2", "MODL": "2024", "WZ": "WZ-1", "FILE CON": "CON-A", "LOCATION": "Guntur", "KEY": "WITH KEY", "FILE TYPE": "REGULAR", "FINANCE": "FIN-A", "E CHALN": "1500" }
+    ]
+  }
+}

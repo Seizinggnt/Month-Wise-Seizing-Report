@@ -46,28 +46,6 @@
     .btn-timer { background: #0284c7; color: #fff; cursor: pointer; }
     .btn-timer.paused { background: #475569; }
     .btn-refresh { background: #10b981; color: #fff; cursor: pointer; }
-    .btn-setup { background: #f59e0b; color: #0f172a; cursor: pointer; }
-    .setup-box {
-      background: #fff;
-      border: 2px solid #2563eb;
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 14px;
-      display: none;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .setup-box.show { display: flex; }
-    .setup-box input {
-      flex: 1;
-      min-width: 300px;
-      padding: 10px 12px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      font-size: 0.86rem;
-    }
-    .btn-save { background: var(--primary); color: #fff; cursor: pointer; }
     .status-banner {
       background: #ecfdf5;
       border: 1px solid #a7f3d0;
@@ -168,17 +146,11 @@
       </select>
       <button type="button" class="btn btn-timer" id="autoTimerBtn" onclick="toggleAutoRefresh()">Auto: 60s</button>
       <button type="button" class="btn btn-refresh" id="refreshBtn">Refresh Now</button>
-      <button type="button" class="btn btn-setup" id="toggleSetupBtn" onclick="toggleSetupBox()">Google Sheet URL</button>
     </div>
   </header>
 
-  <div class="setup-box" id="setupBox">
-    <input type="text" id="webAppInput" placeholder="Paste Google Apps Script Web App URL (https://script.google.com/macros/s/.../exec)" />
-    <button type="button" class="btn btn-save" id="saveUrlBtn" onclick="saveAndLoadUrl()">Save & Load Live</button>
-  </div>
-
   <div class="status-banner warn" id="statusBanner">
-    <span>Snapshot loaded. Live Google Sheet tabs sync kosam "Google Sheet URL" button nokki /exec link save cheyyandi.</span>
+    <span>Loading live data from repository (data.json)...</span>
   </div>
 
   <section class="kpis">
@@ -242,7 +214,6 @@
 </div>
 
 <script>
-const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 const AUTO_REFRESH_SECONDS = 60;
 
 const BUILTIN_SUMMARY = {
@@ -295,7 +266,7 @@ const BUILTIN_SUMMARY = {
 
 let countdownSec = AUTO_REFRESH_SECONDS;
 let autoRefreshEnabled = true;
-let cachedPayload = null;
+let cachedJson = null;
 const memStorage = {};
 
 function storageGet(key) {
@@ -303,12 +274,6 @@ function storageGet(key) {
 }
 function storageSet(key, val) {
   try { window.localStorage.setItem(key, val); } catch (e) { memStorage[key] = val; }
-}
-function getActiveUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const qUrl = (params.get('url') || '').trim();
-  if (qUrl) return qUrl;
-  return (storageGet('seizure_webapp_url') || DEFAULT_WEB_APP_URL).trim();
 }
 function updateTimerButton() {
   const btn = document.getElementById('autoTimerBtn');
@@ -325,16 +290,6 @@ function toggleAutoRefresh() {
   autoRefreshEnabled = !autoRefreshEnabled;
   if (autoRefreshEnabled) countdownSec = AUTO_REFRESH_SECONDS;
   updateTimerButton();
-}
-function toggleSetupBox() {
-  const box = document.getElementById('setupBox');
-  if (!box) return;
-  box.classList.toggle('show');
-  const inp = document.getElementById('webAppInput');
-  if (box.classList.contains('show') && inp) {
-    inp.value = getActiveUrl();
-    inp.focus();
-  }
 }
 function normalizeKey(k) {
   return String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -447,7 +402,6 @@ function buildSummary(rawRows, sheetName, resetMonthSelect) {
   if (!resetMonthSelect && [...sel.options].some(o => o.value === prevVal)) {
     sel.value = prevVal;
   } else {
-    // Tab lo 1 month unte daanne select chestundi; multiple months unte latest month select chestundi
     sel.value = ymSet[ymSet.length - 1];
   }
 
@@ -594,12 +548,12 @@ function renderSvgDailyChart(containerId, dayRows) {
   document.getElementById(containerId).innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:220px;"><line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="#94a3b8" stroke-width="1"/>${bars}<polyline fill="none" stroke="#dc2626" stroke-width="2.2" points="${pts.join(' ')}"/></svg>`;
 }
 
-function renderDashboard(data, sourceLabel, isLive) {
+function renderDashboard(data, sourceLabel, isLive, updatedInfo = '') {
   const banner = document.getElementById('statusBanner');
   banner.className = isLive ? 'status-banner' : 'status-banner warn';
   banner.innerHTML =
-    `<span>${isLive ? 'LIVE SHEET TAB' : 'SNAPSHOT'}: <strong>${sourceLabel}</strong></span>` +
-    `<span>Tab Total: <strong>${data.total}</strong> | Live: <strong>${data.live}</strong> | ${data.latestLabel}: <strong>${data.latestTotal}</strong> | E-Challan: <strong>₹${data.latestChallan.toLocaleString('en-IN')}</strong> | Synced: ${new Date().toLocaleTimeString()}</span>`;
+    `<span>${isLive ? 'LIVE SHEET TAB' : 'SNAPSHOT'}: <strong>${sourceLabel}</strong>${updatedInfo ? ` • Sheet Synced: ${updatedInfo}` : ''}</span>` +
+    `<span>Tab Total: <strong>${data.total}</strong> | Live: <strong>${data.live}</strong> | ${data.latestLabel}: <strong>${data.latestTotal}</strong> | E-Challan: <strong>₹${data.latestChallan.toLocaleString('en-IN')}</strong></span>`;
 
   ['b1','b2','b3','b4','b5'].forEach(id => {
     const el = document.getElementById(id);
@@ -668,151 +622,90 @@ function renderDashboard(data, sourceLabel, isLive) {
   renderSvgDailyChart('novChartBox', data.p1.filter(r => r.level === 2));
 }
 
-function fetchViaJsonp(url) {
-  return new Promise((resolve, reject) => {
-    const cbName = '__seizureCb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-    const script = document.createElement('script');
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('Timeout: Apps Script respond avvaledu (Anyone access check cheyyandi)'));
-    }, 15000);
+function renderFromCachedJson(requestedTab = '', resetMonthSelect = false) {
+  if (!cachedJson) return;
+  const tabs = cachedJson.tabs || [];
+  const activeTab = (requestedTab && tabs.includes(requestedTab))
+    ? requestedTab
+    : (cachedJson.defaultTab || tabs[0] || '');
 
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
+  if (tabs.length > 0) {
+    const tabSel = document.getElementById('tabSelect');
+    tabSel.innerHTML = tabs.map(t => `<option value="${t}">Sheet Tab: ${t}</option>`).join('');
+    tabSel.value = activeTab;
+    storageSet('seizure_selected_tab', activeTab);
+  }
 
-    window[cbName] = (data) => {
-      cleanup();
-      resolve(data);
-    };
+  const rows = (cachedJson.dataByTab && cachedJson.dataByTab[activeTab]) ? cachedJson.dataByTab[activeTab] : [];
+  const banner = document.getElementById('statusBanner');
+  if (!rows.length) {
+    banner.className = 'status-banner err';
+    banner.innerHTML = `<span>Tab "${activeTab}" lo 0 rows unnai.</span>`;
+    return;
+  }
 
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('Script load error: Apps Script URL public ga ledu (Deploy -> Who has access: Anyone)'));
-    };
+  const summary = buildSummary(rows, activeTab, resetMonthSelect);
+  if (!summary) {
+    banner.className = 'status-banner err';
+    banner.innerHTML = '<span>HP NO / SEZ DATE columns match avvaledu.</span>';
+    return;
+  }
 
-    const sep = url.includes('?') ? '&' : '?';
-    script.src = `${url}${sep}callback=${cbName}&_t=${Date.now()}`;
-    document.body.appendChild(script);
-  });
+  const syncedTime = cachedJson.updatedAt ? new Date(cachedJson.updatedAt).toLocaleString('en-IN') : '';
+  renderDashboard(summary, `${activeTab} (${rows.length} rows)`, true, syncedTime);
 }
 
-async function fetchLiveFromAppsScript(url, requestedTab = '', resetMonthSelect = false) {
+async function fetchLiveData(requestedTab = '', resetMonthSelect = false) {
   countdownSec = AUTO_REFRESH_SECONDS;
   updateTimerButton();
   const banner = document.getElementById('statusBanner');
 
-  if (!url || !url.includes('/exec')) {
-    banner.className = 'status-banner warn';
-    banner.innerHTML = '<span>Snapshot loaded. "Google Sheet URL" button nokki /exec link save cheyyandi.</span>';
-    return;
-  }
-
-  banner.className = 'status-banner warn';
-  banner.innerHTML = `<span>Syncing "${requestedTab || '08 Nov 26'}" tab from Google Sheet...</span>`;
-
-  const sep = url.includes('?') ? '&' : '?';
-  const tabParam = requestedTab ? `&tab=${encodeURIComponent(requestedTab)}` : '';
-  const baseWithTab = `${url}${sep}_t=${Date.now()}${tabParam}`;
-
   try {
-    let json = null;
-    try {
-      const res = await fetch(baseWithTab, { cache: 'no-store' });
-      const text = await res.text();
-      json = JSON.parse(text);
-    } catch (fetchErr) {
-      // Mobile / Cross-Origin lo fetch block ayithe automatic ga JSONP use chestundi
-      json = await fetchViaJsonp(`${url}${sep}${tabParam.replace(/^&/, '')}`);
-    }
-
-    if (Array.isArray(json.tabs) && json.tabs.length > 0) {
-      const tabSel = document.getElementById('tabSelect');
-      tabSel.innerHTML = json.tabs.map(t => `<option value="${t}">Sheet Tab: ${t}</option>`).join('');
-      if (json.sheetName && json.tabs.includes(json.sheetName)) {
-        tabSel.value = json.sheetName;
-        storageSet('seizure_selected_tab', json.sheetName);
-      }
-    }
-
-    if (json.error) {
-      banner.className = 'status-banner err';
-      banner.innerHTML = `<span>Live Sync Failed: ${json.error}</span>`;
+    const res = await fetch(`./data.json?_t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) {
+      banner.className = 'status-banner warn';
+      banner.innerHTML = '<span>data.json inka create avvaledu — Google Apps Script lo pushSheetToGitHub okasari Run cheyyandi.</span>';
       return;
     }
-
-    if (!json.rows || !json.rows.length) {
-      banner.className = 'status-banner err';
-      banner.innerHTML = `<span>Tab "${json.sheetName || requestedTab}" lo 0 rows vachayi.</span>`;
-      return;
-    }
-
-    const summary = buildSummary(json.rows, json.sheetName || requestedTab, resetMonthSelect);
-    if (!summary) {
-      const sampleHeaders = Object.keys(json.rows[0] || {}).join(', ');
-      banner.className = 'status-banner err';
-      banner.innerHTML = `<span>HP NO / SEZ DATE match avvaledu. Headers: [${sampleHeaders}]</span>`;
-      return;
-    }
-
-    cachedPayload = json;
-    renderDashboard(summary, `${json.sheetName} (${json.rows.length} rows)`, true);
+    cachedJson = await res.json();
+    renderFromCachedJson(requestedTab, resetMonthSelect);
   } catch (err) {
     banner.className = 'status-banner err';
-    banner.innerHTML = `<span>Live Sync Failed: ${err.message}</span>`;
+    banner.innerHTML = `<span>Sync Error: ${err.message}</span>`;
   }
-}
-function saveAndLoadUrl() {
-  const inp = document.getElementById('webAppInput');
-  const url = (inp ? inp.value : '').trim();
-  storageSet('seizure_webapp_url', url);
-  const box = document.getElementById('setupBox');
-  if (box) box.classList.remove('show');
-  const savedTab = storageGet('seizure_selected_tab') || '08 Nov 26';
-  fetchLiveFromAppsScript(url, savedTab, true);
 }
 
 document.getElementById('tabSelect').addEventListener('change', (e) => {
   const chosenTab = e.target.value;
   storageSet('seizure_selected_tab', chosenTab);
-  fetchLiveFromAppsScript(getActiveUrl(), chosenTab, true);
+  renderFromCachedJson(chosenTab, true);
 });
 
 document.getElementById('monthSelect').addEventListener('change', () => {
-  if (cachedPayload && cachedPayload.rows) {
-    const summary = buildSummary(cachedPayload.rows, cachedPayload.sheetName || 'Selected Tab', false);
-    if (summary) renderDashboard(summary, `${cachedPayload.sheetName} (${cachedPayload.rows.length} rows)`, true);
-  }
+  const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '';
+  renderFromCachedJson(currentTab, false);
 });
 
 document.getElementById('refreshBtn').addEventListener('click', () => {
-  const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '08 Nov 26';
-  fetchLiveFromAppsScript(getActiveUrl(), currentTab, false);
+  const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '';
+  fetchLiveData(currentTab, false);
 });
 
 setInterval(() => {
   if (!autoRefreshEnabled) return;
-  const activeUrl = getActiveUrl();
-  if (!activeUrl || !activeUrl.includes('/exec')) return;
   countdownSec -= 1;
   if (countdownSec <= 0) {
     countdownSec = AUTO_REFRESH_SECONDS;
-    const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '08 Nov 26';
-    fetchLiveFromAppsScript(activeUrl, currentTab, false);
+    const currentTab = document.getElementById('tabSelect').value || storageGet('seizure_selected_tab') || '';
+    fetchLiveData(currentTab, false);
   }
   updateTimerButton();
 }, 1000);
 
 renderDashboard(BUILTIN_SUMMARY, 'Built-in Snapshot (08 Nov 26)', false);
 updateTimerButton();
-const startUrl = getActiveUrl();
 const initialTab = storageGet('seizure_selected_tab') || '08 Nov 26';
-if (startUrl) {
-  document.getElementById('webAppInput').value = startUrl;
-  fetchLiveFromAppsScript(startUrl, initialTab, true);
-}
+fetchLiveData(initialTab, true);
 </script>
 </body>
 </html>

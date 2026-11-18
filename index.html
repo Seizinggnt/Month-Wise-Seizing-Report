@@ -734,6 +734,7 @@ async function fetchLiveFromAppsScript(url, requestedTab = '', resetMonthSelect 
       if (json.sheetName && json.tabs.includes(json.sheetName)) {
         tabSel.value = json.sheetName;
         storageSet('seizure_selected_tab', json.sheetName);
+      }
     }
 
     if (json.error) {
